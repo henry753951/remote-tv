@@ -32,6 +32,10 @@ jobs:
           targets: armv7-linux-androideabi
       - name: Test protocol and navigation
         run: cargo test --locked -p atv-core
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          log-accepted-android-sdk-licenses: false
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;27.0.12077973"
       - name: Build and lint
