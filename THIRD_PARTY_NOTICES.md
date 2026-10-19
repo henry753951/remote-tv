@@ -4,6 +4,10 @@ Remote TV includes code from [corvofeng/atv-core](https://github.com/corvofeng/a
 (commit `8a4ada29bb7cad31e0315c3387b277eb9ab8c988`). The upstream workspace manifest
 and README declare the MIT license. Original source notices are retained.
 
+Protocol behavior also follows the MIT-licensed
+[pyatv reference implementation](https://github.com/postlund/pyatv).
+Copyright (c) 2020 Pierre Ståhl; its license is included in the APK notices.
+
 The Rust core and Android bridge remain in their original namespaces to keep JNI
 and protocol interfaces compatible. The Android application has its own package ID.
 Workspace CLI sources are retained with the original Cargo.lock; Android is the
