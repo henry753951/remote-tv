@@ -1,0 +1,100 @@
+// Protocol fixtures inherited from atv-core; see THIRD_PARTY_NOTICES.md.
+// Each case asserts byte-identical OPACK output vs fake_atv.opack_pack,
+// plus unpack() returning an equal value.
+#![allow(clippy::all)]
+
+use atv_core::opack::{pack, unpack, Value};
+
+fn b(hex: &str) -> Value { Value::Bytes(hex::decode(hex).unwrap()) }
+fn u(hex: &str) -> Value { Value::Uuid(hex::decode(hex).unwrap().try_into().unwrap()) }
+fn arr(xs: Vec<Value>) -> Value { Value::Array(xs) }
+fn dct(xs: Vec<(Value, Value)>) -> Value { Value::Dict(xs) }
+
+fn check(name: &str, value: Value, expected_hex: &str) {
+    let expected = hex::decode(expected_hex).unwrap();
+    let packed = pack(&value);
+    assert_eq!(packed, expected, "pack mismatch for {name}");
+    let (unpacked, remaining) = unpack(&expected).unwrap();
+    assert!(remaining.is_empty(), "trailing bytes for {name}");
+    assert_eq!(unpacked, value, "unpack mismatch for {name}");
+}
+
+#[test]
+fn opack_none() {
+    check("none", Value::Null, "04");
+}
+
+#[test]
+fn opack_bools() {
+    check("bools", arr(vec![Value::Bool(true), Value::Bool(false)]), "d20102");
+}
+
+#[test]
+fn opack_small_ints() {
+    check("small_ints", arr(vec![Value::Int(0u64), Value::Int(1u64), Value::Int(39u64)]), "d308092f");
+}
+
+#[test]
+fn opack_int_boundaries() {
+    check("int_boundaries", arr(vec![Value::Int(40u64), Value::Int(255u64), Value::Int(256u64), Value::Int(65535u64), Value::Int(65536u64), Value::Int(4294967295u64), Value::Int(4294967296u64), Value::Int(18446744073709551615u64)]), "d8302830ff31000131ffff320000010032ffffffff33000000000100000033ffffffffffffffff");
+}
+
+#[test]
+fn opack_floats() {
+    check("floats", arr(vec![Value::Double(0.5), Value::Double(-1.25), Value::Double(3.141592653589793), Value::Double(1e+300)]), "d436000000000000e03f36000000000000f4bf36182d4454fb210940369c7500883ce4377e");
+}
+
+#[test]
+fn opack_strings() {
+    check("strings", arr(vec![Value::str(""), Value::str("a"), Value::str("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"), Value::str("yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), Value::str("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"), Value::str("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"), Value::str("遥控器🔥"), Value::str("quote\"back\\slash")]), "d8404161607878787878787878787878787878787878787878787878787878787878787878612179797979797979797979797979797979797979797979797979797979797979797961ff7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a620001777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777774de981a5e68ea7e599a8f09f94a55071756f7465226261636b5c736c617368");
+}
+
+#[test]
+fn opack_bytes() {
+    check("bytes", arr(vec![b(""), b("00"), b("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), b("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"), b("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff")]), "d570710090000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f9121000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20920002000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff");
+}
+
+#[test]
+fn opack_uuid() {
+    check("uuid", u("5d797fd33538427ea47ba32fc6cf3a6a"), "055d797fd33538427ea47ba32fc6cf3a6a");
+}
+
+#[test]
+fn opack_array_simple() {
+    check("array_simple", arr(vec![Value::Int(1u64), Value::str("two"), b("03"), Value::Null, Value::Bool(true), Value::Double(2.5)]), "d6094374776f71030401360000000000000440");
+}
+
+#[test]
+fn opack_array_endless() {
+    check("array_endless", arr(vec![Value::Int(0u64), Value::Int(1u64), Value::Int(2u64), Value::Int(3u64), Value::Int(4u64), Value::Int(5u64), Value::Int(6u64), Value::Int(7u64), Value::Int(8u64), Value::Int(9u64), Value::Int(10u64), Value::Int(11u64), Value::Int(12u64), Value::Int(13u64), Value::Int(14u64), Value::Int(15u64), Value::Int(16u64), Value::Int(17u64), Value::Int(18u64), Value::Int(19u64)]), "df08090a0b0c0d0e0f101112131415161718191a1b03");
+}
+
+#[test]
+fn opack_nested() {
+    check("nested", dct(vec![(Value::str("a"), arr(vec![Value::Int(1u64), dct(vec![(Value::str("b"), arr(vec![Value::Int(2u64), dct(vec![(Value::str("c"), Value::Null)])]))]), Value::str("not-a-tuple")])), (Value::str("d"), dct(vec![(Value::str("e"), arr(vec![dct(vec![(Value::str("f"), Value::Double(1.5))])]))]))]), "e24161d309e14162d20ae14163044b6e6f742d612d7475706c654164e14165d1e1416636000000000000f83f");
+}
+
+#[test]
+fn opack_dict_simple() {
+    check("dict_simple", dct(vec![(Value::str("_i"), Value::str("_hidC")), (Value::str("_t"), Value::Int(2u64)), (Value::str("_c"), dct(vec![(Value::str("_hidC"), Value::Int(1u64)), (Value::str("_hBtS"), Value::Int(1u64))])), (Value::str("_x"), Value::Int(12345u64))]), "e4425f69455f68696443425f740a425f63e2a109455f6842745309425f78313930");
+}
+
+#[test]
+fn opack_dict_endless() {
+    check("dict_endless", dct(vec![(Value::str("key00"), Value::Int(0u64)), (Value::str("key01"), Value::Int(7u64)), (Value::str("key02"), Value::Int(14u64)), (Value::str("key03"), Value::Int(21u64)), (Value::str("key04"), Value::Int(28u64)), (Value::str("key05"), Value::Int(35u64)), (Value::str("key06"), Value::Int(42u64)), (Value::str("key07"), Value::Int(49u64)), (Value::str("key08"), Value::Int(56u64)), (Value::str("key09"), Value::Int(63u64)), (Value::str("key10"), Value::Int(70u64)), (Value::str("key11"), Value::Int(77u64)), (Value::str("key12"), Value::Int(84u64)), (Value::str("key13"), Value::Int(91u64)), (Value::str("key14"), Value::Int(98u64)), (Value::str("key15"), Value::Int(105u64))]), "ef456b6579303008456b657930310f456b6579303216456b657930331d456b6579303424456b657930352b456b65793036302a456b657930373031456b657930383038456b65793039303f456b657931303046456b65793131304d456b657931323054456b65793133305b456b657931343062456b65793135306903");
+}
+
+#[test]
+fn opack_object_ref_short() {
+    check("object_ref_short", dct(vec![(Value::str("k1"), Value::str("repeated-string-value")), (Value::str("k2"), Value::str("repeated-string-value"))]), "e2426b315572657065617465642d737472696e672d76616c7565426b32a1");
+}
+
+#[test]
+fn opack_object_ref_nested() {
+    check("object_ref_nested", arr(vec![arr(vec![Value::str("shared bytes object"), Value::str("shared bytes object"), Value::str("shared bytes object")]), dct(vec![(Value::str("x"), Value::str("shared bytes object"))])]), "d2d353736861726564206279746573206f626a656374a0a0e14178a0");
+}
+
+#[test]
+fn opack_object_ref_long_index() {
+    check("object_ref_long_index", dct(vec![(Value::str("k00"), Value::str("distinct-value-00")), (Value::str("k01"), Value::str("distinct-value-01")), (Value::str("k02"), Value::str("distinct-value-02")), (Value::str("k03"), Value::str("distinct-value-03")), (Value::str("k04"), Value::str("distinct-value-04")), (Value::str("k05"), Value::str("distinct-value-05")), (Value::str("k06"), Value::str("distinct-value-06")), (Value::str("k07"), Value::str("distinct-value-07")), (Value::str("k08"), Value::str("distinct-value-08")), (Value::str("k09"), Value::str("distinct-value-09")), (Value::str("k10"), Value::str("distinct-value-10")), (Value::str("k11"), Value::str("distinct-value-11")), (Value::str("k12"), Value::str("distinct-value-12")), (Value::str("k13"), Value::str("distinct-value-13")), (Value::str("k14"), Value::str("distinct-value-14")), (Value::str("k15"), Value::str("distinct-value-15")), (Value::str("k16"), Value::str("distinct-value-16")), (Value::str("k17"), Value::str("distinct-value-17")), (Value::str("k18"), Value::str("distinct-value-18")), (Value::str("k19"), Value::str("distinct-value-19")), (Value::str("k20"), Value::str("distinct-value-20")), (Value::str("k21"), Value::str("distinct-value-21")), (Value::str("k22"), Value::str("distinct-value-22")), (Value::str("k23"), Value::str("distinct-value-23")), (Value::str("k24"), Value::str("distinct-value-24")), (Value::str("k25"), Value::str("distinct-value-25")), (Value::str("k26"), Value::str("distinct-value-26")), (Value::str("k27"), Value::str("distinct-value-27")), (Value::str("k28"), Value::str("distinct-value-28")), (Value::str("k29"), Value::str("distinct-value-29")), (Value::str("k30"), Value::str("distinct-value-30")), (Value::str("k31"), Value::str("distinct-value-31")), (Value::str("k32"), Value::str("distinct-value-32")), (Value::str("k33"), Value::str("distinct-value-33")), (Value::str("k34"), Value::str("distinct-value-34")), (Value::str("k35"), Value::str("distinct-value-35")), (Value::str("k36"), Value::str("distinct-value-36")), (Value::str("k37"), Value::str("distinct-value-37")), (Value::str("k38"), Value::str("distinct-value-38")), (Value::str("k39"), Value::str("distinct-value-39")), (Value::str("repeat"), Value::str("distinct-value-00"))]), "ef436b30305164697374696e63742d76616c75652d3030436b30315164697374696e63742d76616c75652d3031436b30325164697374696e63742d76616c75652d3032436b30335164697374696e63742d76616c75652d3033436b30345164697374696e63742d76616c75652d3034436b30355164697374696e63742d76616c75652d3035436b30365164697374696e63742d76616c75652d3036436b30375164697374696e63742d76616c75652d3037436b30385164697374696e63742d76616c75652d3038436b30395164697374696e63742d76616c75652d3039436b31305164697374696e63742d76616c75652d3130436b31315164697374696e63742d76616c75652d3131436b31325164697374696e63742d76616c75652d3132436b31335164697374696e63742d76616c75652d3133436b31345164697374696e63742d76616c75652d3134436b31355164697374696e63742d76616c75652d3135436b31365164697374696e63742d76616c75652d3136436b31375164697374696e63742d76616c75652d3137436b31385164697374696e63742d76616c75652d3138436b31395164697374696e63742d76616c75652d3139436b32305164697374696e63742d76616c75652d3230436b32315164697374696e63742d76616c75652d3231436b32325164697374696e63742d76616c75652d3232436b32335164697374696e63742d76616c75652d3233436b32345164697374696e63742d76616c75652d3234436b32355164697374696e63742d76616c75652d3235436b32365164697374696e63742d76616c75652d3236436b32375164697374696e63742d76616c75652d3237436b32385164697374696e63742d76616c75652d3238436b32395164697374696e63742d76616c75652d3239436b33305164697374696e63742d76616c75652d3330436b33315164697374696e63742d76616c75652d3331436b33325164697374696e63742d76616c75652d3332436b33335164697374696e63742d76616c75652d3333436b33345164697374696e63742d76616c75652d3334436b33355164697374696e63742d76616c75652d3335436b33365164697374696e63742d76616c75652d3336436b33375164697374696e63742d76616c75652d3337436b33385164697374696e63742d76616c75652d3338436b33395164697374696e63742d76616c75652d333946726570656174a103");
+}

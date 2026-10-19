@@ -1,0 +1,22 @@
+[package]
+name = "atv-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Apple TV simulator: Companion Link protocol server (Bonjour, SRP pairing, encrypted remote control)"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "io-util", "sync", "process"] }
+mdns-sd = "0.13"
+ed25519-dalek = "2"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+chacha20poly1305 = "0.10"
+sha2 = "0.10"
+hkdf = "0.12"
+num-bigint = { version = "0.4", features = ["rand"] }
+num-traits = "0.2"
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
+hex = "0.4"
+thiserror = "2"
+tracing = "0.1"

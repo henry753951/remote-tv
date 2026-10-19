@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = ["crates/atv-core", "crates/atv-cli", "crates/atv-android"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center" android:padding="40dp"
+    android:background="#0B0B0D">
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="@string/app_name" android:textSize="26sp" android:textColor="#F5F5F7" />
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="20dp" android:text="@string/pairing_title" android:textSize="16sp" android:textColor="#A1A1A6" />
+    <TextView android:id="@+id/tvPin" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:textSize="62sp" android:textColor="#F5F5F7" android:fontFamily="sans-serif-light" />
+    <TextView android:id="@+id/tvStatus" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="22dp" android:textSize="15sp" android:textColor="#A1A1A6" />
+    <Button android:id="@+id/btnToggle" android:layout_width="130dp" android:layout_height="wrap_content"
+        android:layout_marginTop="24dp" android:text="@string/return_to_tv" android:textColor="#F5F5F7"
+        android:backgroundTint="#303034" android:focusable="true" />
+</LinearLayout>

@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Remote TV</string>
+    <string name="pairing_title">輸入配對碼</string>
+    <string name="return_to_tv">返回電視</string>
+    <string name="remote_ready">在 iPhone「Apple TV 遙控器」選擇 %1$s</string>
+    <string name="remote_authorize">請先允許電視上的偵錯連線，再用 iPhone 配對</string>
+    <string name="accessibility_service_description">接收 Apple TV 遙控器的方向與媒體控制指令。</string>
+</resources>

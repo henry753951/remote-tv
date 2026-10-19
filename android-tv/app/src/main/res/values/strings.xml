@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Remote TV</string>
+    <string name="pairing_title">Enter pairing code</string>
+    <string name="return_to_tv">Back to TV</string>
+    <string name="remote_ready">Select %1$s in Apple TV Remote on your iPhone</string>
+    <string name="remote_authorize">Allow the debugging connection on your TV, then pair your iPhone</string>
+    <string name="accessibility_service_description">Receives directional and media controls from Apple TV Remote.</string>
+</resources>

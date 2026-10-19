@@ -1,0 +1,1354 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Apple TV Remote Inspector</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090b10;
+      --panel: rgba(22, 26, 35, .85);
+      --line: rgba(255, 255, 255, .1);
+      --muted: #8c96aa;
+      --text: #f4f7ff;
+      --blue: #5da9ff;
+      --cyan: #70f1dc;
+      --red: #ff6b7d;
+      --green: #4caf50;
+      --orange: #ffa726;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 18% 0%, #172342 0, transparent 38%),
+        radial-gradient(circle at 90% 15%, #132e30 0, transparent 35%),
+        var(--bg);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    }
+    main { width: min(1440px, calc(100% - 40px)); margin: 0 auto; padding: 24px 0 40px; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 14px; }
+    h1 { margin: 0; font-size: 26px; letter-spacing: -.03em; }
+    .subtitle { margin-top: 4px; color: var(--muted); }
+    .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .status-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .status { display: flex; align-items: center; gap: 9px; color: var(--muted); font-weight: 500; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); box-shadow: 0 0 12px currentColor; }
+    .dot.online { color: var(--cyan); background: var(--cyan); }
+    .client-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+      transition: all .2s ease;
+    }
+    .client-badge.connected {
+      background: rgba(112, 241, 220, 0.15);
+      border-color: rgba(112, 241, 220, 0.35);
+      color: var(--cyan);
+    }
+    .client-badge.waiting {
+      background: rgba(255, 204, 0, 0.1);
+      border-color: rgba(255, 204, 0, 0.25);
+      color: #ffcc00;
+    }
+    .refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(93, 169, 255, 0.14);
+      border: 1px solid rgba(93, 169, 255, 0.4);
+      color: var(--blue);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .refresh-btn:hover {
+      background: rgba(93, 169, 255, 0.25);
+      border-color: var(--blue);
+      color: #fff;
+      box-shadow: 0 0 14px rgba(93, 169, 255, 0.4);
+      transform: translateY(-1px);
+    }
+    .refresh-btn:active {
+      transform: translateY(0) scale(0.97);
+    }
+    .refresh-btn.loading {
+      pointer-events: none;
+      opacity: 0.75;
+    }
+    .refresh-btn.loading .refresh-icon {
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .refresh-icon {
+      display: inline-block;
+      transition: transform 0.2s ease;
+    }
+    .tp-refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .tp-refresh-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .sync-tag {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-weight: 600;
+      text-transform: none;
+    }
+    .sync-tag.ok {
+      background: rgba(112, 241, 220, 0.15);
+      color: var(--cyan);
+    }
+    .sync-tag.syncing {
+      background: rgba(93, 169, 255, 0.15);
+      color: var(--blue);
+    }
+    .tp-value.pulse-update {
+      animation: pulseHighlight 1s ease;
+    }
+    @keyframes pulseHighlight {
+      0% { background: rgba(112, 241, 220, 0.35); border-radius: 4px; }
+      100% { background: transparent; }
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .column { display: grid; gap: 16px; align-content: start; }
+    .card { border: 1px solid var(--line); border-radius: 16px; background: var(--panel); backdrop-filter: blur(18px); overflow: hidden; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+    .card-head h2 { margin: 0; font-size: 13px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+    .pill { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .last-action { min-height: 140px; display: grid; place-items: center; text-align: center; padding: 20px; }
+    .action-name { font-size: clamp(32px, 4.5vw, 56px); font-weight: 750; letter-spacing: -.04em; color: var(--text); }
+    .action-meta { margin-top: 4px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .action-state { display: inline-block; min-width: 50px; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(93,169,255,.14); color: var(--blue); }
+
+    /* Virtual Remote */
+    .remote-wrap { padding: 18px; display: flex; justify-content: center; gap: 20px; align-items: center; }
+    .remote-dpad {
+      display: grid;
+      grid-template-columns: 56px 56px 56px;
+      grid-template-rows: 56px 56px 56px;
+      gap: 6px;
+    }
+    .r-btn {
+      background: rgba(255, 255, 255, .08);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--text);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-weight: 600;
+      transition: all .1s ease;
+      user-select: none;
+    }
+    .r-btn:hover { background: rgba(93, 169, 255, .25); border-color: var(--blue); }
+    .r-btn:active { transform: scale(0.95); background: var(--blue); color: #000; }
+    .r-center { grid-column: 2; grid-row: 2; border-radius: 50%; font-size: 11px; }
+    .remote-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 180px; }
+    .remote-actions .r-btn { height: 42px; border-radius: 8px; font-size: 13px; }
+
+    .touch-wrap { position: relative; aspect-ratio: 1.6; min-height: 320px; background: linear-gradient(145deg, rgba(255,255,255,.035), transparent); }
+    canvas { display: block; width: 100%; height: 100%; }
+    .touch-readout { position: absolute; top: 12px; left: 14px; color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; pointer-events: none; }
+    .history { list-style: none; margin: 0; padding: 6px; max-height: 240px; overflow: auto; }
+    .history li { display: grid; grid-template-columns: 80px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 13px; }
+    .history li:nth-child(odd) { background: rgba(255,255,255,.03); }
+    .time, code { color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .raw { height: 360px; margin: 0; padding: 12px 14px; overflow: auto; white-space: pre-wrap; word-break: break-word; color: #b8c1d4; font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .vol-wrap { padding: 14px 18px; }
+    .vol-bar { height: 14px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .vol-fill { height: 100%; width: 50%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--cyan)); transition: width .18s ease; }
+    .vol-fill.muted { background: var(--red); }
+    .vol-state { margin-top: 8px; color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    /* Mode Switcher Bar */
+    .mode-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding: 14px 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      backdrop-filter: blur(18px);
+    }
+    .mode-info { display: flex; align-items: center; gap: 12px; }
+    .mode-title { font-weight: 650; font-size: 14px; color: var(--text); }
+    .mode-badge {
+      font-size: 12px;
+      padding: 3px 12px;
+      border-radius: 999px;
+      background: rgba(93, 169, 255, 0.15);
+      color: var(--blue);
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .mode-badge.direction {
+      background: rgba(93, 169, 255, 0.15);
+      color: var(--blue);
+    }
+    .mode-badge.mouse {
+      background: rgba(112, 241, 220, 0.15);
+      color: var(--cyan);
+    }
+    .mode-badge.idle {
+      background: rgba(255, 179, 71, 0.18);
+      color: var(--amber);
+      border: 1px solid rgba(255, 179, 71, 0.35);
+    }
+    .tp-value.highlight-idle {
+      color: var(--amber);
+      font-weight: 700;
+      text-shadow: 0 0 10px rgba(255, 179, 71, 0.3);
+    }
+
+    /* Radio Group for Running Mode (Single Choice) */
+    .mode-radio-group {
+      display: inline-flex;
+      background: rgba(0, 0, 0, 0.28);
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      gap: 3px;
+      flex-wrap: wrap;
+    }
+    .mode-radio-card {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      border: 1px solid transparent;
+      transition: all 0.16s ease;
+      background: transparent;
+    }
+    .mode-radio-card input[type="radio"] {
+      appearance: none;
+      -webkit-appearance: none;
+      margin: 0;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--muted);
+      display: grid;
+      place-content: center;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    .mode-radio-card input[type="radio"]::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      transform: scale(0);
+      transition: 0.12s transform ease-in-out;
+      background: #090b10;
+    }
+    .mode-radio-card:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .mode-radio-card.active-direction {
+      background: rgba(93, 169, 255, 0.18);
+      color: var(--blue);
+      border-color: rgba(93, 169, 255, 0.45);
+    }
+    .mode-radio-card.active-direction input[type="radio"] {
+      border-color: var(--blue);
+      background: var(--blue);
+    }
+    .mode-radio-card.active-mouse {
+      background: rgba(112, 241, 220, 0.18);
+      color: var(--cyan);
+      border-color: rgba(112, 241, 220, 0.45);
+    }
+    .mode-radio-card.active-mouse input[type="radio"] {
+      border-color: var(--cyan);
+      background: var(--cyan);
+    }
+    .mode-radio-card.active-idle {
+      background: rgba(255, 179, 71, 0.18);
+      color: var(--amber);
+      border-color: rgba(255, 179, 71, 0.45);
+    }
+    .mode-radio-card.active-idle input[type="radio"] {
+      border-color: var(--amber);
+      background: var(--amber);
+    }
+    .mode-radio-card.active-direction input[type="radio"]::before,
+    .mode-radio-card.active-mouse input[type="radio"]::before,
+    .mode-radio-card.active-idle input[type="radio"]::before {
+      transform: scale(1);
+    }
+
+    .mode-buttons { display: flex; gap: 8px; }
+    .m-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 7px 15px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .m-btn:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.25); }
+    .m-btn.active {
+      background: var(--blue);
+      color: #090b10;
+      border-color: var(--blue);
+      box-shadow: 0 0 14px rgba(93, 169, 255, 0.35);
+    }
+
+    /* Driver Settings Panel */
+    .driver-bar {
+      margin-bottom: 20px;
+      padding: 16px 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      backdrop-filter: blur(18px);
+    }
+    .driver-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .driver-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .driver-icon {
+      font-size: 20px;
+      padding: 6px 8px;
+      background: rgba(255, 255, 255, .06);
+      border-radius: 10px;
+      border: 1px solid var(--line);
+    }
+    .driver-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.01em;
+    }
+    .driver-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+    .driver-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .driver-badge {
+      font-size: 13px;
+      font-weight: 700;
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: rgba(112, 241, 220, 0.15);
+      color: var(--cyan);
+      border: 1px solid rgba(112, 241, 220, 0.3);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .accel-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .accel-btn:hover {
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .accel-btn.active {
+      background: rgba(93, 169, 255, 0.16);
+      color: var(--blue);
+      border-color: var(--blue);
+    }
+    .accel-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .accel-btn.active .accel-dot {
+      background: var(--blue);
+      box-shadow: 0 0 8px var(--blue);
+    }
+    .driver-body {
+      display: grid;
+      gap: 14px;
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .slider-label {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      user-select: none;
+    }
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+      cursor: pointer;
+      transition: background .15s ease;
+    }
+    input[type=range]:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px rgba(112, 241, 220, 0.6);
+      cursor: pointer;
+      border: 2px solid #090b10;
+      transition: transform 0.1s ease, box-shadow 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.18);
+      box-shadow: 0 0 16px rgba(112, 241, 220, 0.9);
+    }
+    .preset-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .preset-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+    .p-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 550;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .p-btn:hover {
+      background: rgba(112, 241, 220, 0.12);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .p-btn.active {
+      background: var(--cyan);
+      color: #090b10;
+      border-color: var(--cyan);
+      font-weight: 650;
+      box-shadow: 0 0 12px rgba(112, 241, 220, 0.35);
+    }
+
+    /* Touchpad Record Card & Grid */
+    .tp-record-card {
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 18px;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    .tp-record-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .tp-record-time {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .tp-record-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px 20px;
+    }
+    .tp-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .tp-label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .tp-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .tp-value.highlight {
+      color: var(--cyan);
+    }
+
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      main { width: min(100% - 20px, 720px); }
+      .mode-bar { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .driver-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Apple TV Remote Inspector</h1>
+        <div id="subTitle" class="subtitle">Apple TV Remote 实时状态监控 & 交互调试面板</div>
+      </div>
+      <div class="header-right">
+        <div class="status-group">
+          <div class="status">
+            <span id="dot" class="dot"></span>
+            <span id="connection">等待连接</span>
+          </div>
+          <span id="clientStatusBadge" class="client-badge waiting">📱 等待 iPhone 连接</span>
+        </div>
+        <button id="btnGlobalRefresh" class="refresh-btn" onclick="refreshStatus(true)" title="从服务端同步最新真实状态，确保前后端数据一致">
+          <span id="refreshIcon" class="refresh-icon">🔄</span>
+          <span id="refreshBtnText">刷新状态</span>
+        </button>
+        <a href="http://127.0.0.1:8766/" class="refresh-btn" style="text-decoration: none;" title="打开 Swift 托管的系统运行日志与诊断面板 (8766)">
+          <span>🛠️</span>
+          <span>系统日志 (Swift Web)</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- 🎛️ 触摸板独立设置与状态记录 (Touchpad Settings & Configuration Record) -->
+    <article class="card" style="margin-bottom: 20px;">
+      <div class="card-head">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="driver-icon">🎛️</span>
+          <div>
+            <h2 style="font-size: 14px; margin: 0; text-transform: none; letter-spacing: 0;">触摸板独立设置 (Touchpad Settings)</h2>
+            <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">控制运行模式、光标灵敏度、动力学曲线与事件日志级别</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span id="cardModeBadge" class="mode-badge">🖱️ 鼠标光标</span>
+          <span id="speedDisplay" class="driver-badge">0.50x 慢速</span>
+          <button id="btnVerboseToggle" class="accel-btn" onclick="toggleVerbose()">
+            <span id="verboseDot" class="accel-dot"></span>
+            <span id="verboseText">🔇 事件日志: 静默 (Debug)</span>
+          </button>
+        </div>
+      </div>
+
+      <div style="padding: 18px 20px; display: grid; gap: 16px;">
+        <!-- 第一行：模式切换与动力学曲线开关 -->
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--text);">运行模式 (单选):</span>
+            <div class="mode-radio-group" role="radiogroup" aria-label="触控板运行模式单选">
+              <label class="mode-radio-card" id="labelModeDirection" onclick="setMode('direction')" title="方向键模式：滑动模拟上下左右按键，轻点模拟回车确认">
+                <input type="radio" name="runMode" id="radioModeDirection" value="direction">
+                <span>◀▲▼▶ 方向键</span>
+              </label>
+              <label class="mode-radio-card active-mouse" id="labelModeMouse" onclick="setMode('mouse')" title="鼠标光标模式：触控滑动平滑移动 macOS 鼠标光标，轻点模拟鼠标左键点击">
+                <input type="radio" name="runMode" id="radioModeMouse" value="mouse" checked>
+                <span>🖱️ 鼠标光标</span>
+              </label>
+              <label class="mode-radio-card" id="labelModeIdle" onclick="setMode('idle')" title="空置模式：仅在右侧画布实时预览触控轨迹，不触发任何按键或鼠标移动操作">
+                <input type="radio" name="runMode" id="radioModeIdle" value="idle">
+                <span>👁️ 触控板空置 (仅轨迹预览)</span>
+              </label>
+            </div>
+            <button class="m-btn" style="padding: 6px 12px; font-size: 12px;" onclick="cycleMode()" title="在三个单选模式间顺序循环切换">🔄 轮换</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--text);">动力学算法:</span>
+            <button id="btnAccelToggle" class="accel-btn active" onclick="toggleAccel()">
+              <span class="accel-dot"></span>
+              <span id="accelText">⚡ 动态加速度: 开启</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 第二行：灵敏度滑块与档位预设 -->
+        <div class="driver-body">
+          <div class="slider-row">
+            <span class="slider-label">🐢 慢速精细 (0.2x)</span>
+            <input type="range" id="speedSlider" min="0.2" max="3.0" step="0.05" value="0.5" oninput="onSliderInput(this.value)" onchange="onSliderChange(this.value)">
+            <span class="slider-label">🚀 极速大屏 (3.0x)</span>
+          </div>
+
+          <div class="preset-group">
+            <span class="preset-label">快速预设:</span>
+            <button class="p-btn active" data-speed="0.5" onclick="setSpeedPreset(0.5)">🐢 0.5x 慢速精准 (默认)</button>
+            <button class="p-btn" data-speed="1.0" onclick="setSpeedPreset(1.0)">🎯 1.0x 标准舒适</button>
+            <button class="p-btn" data-speed="1.5" onclick="setSpeedPreset(1.5)">⚡ 1.5x 快速顺畅</button>
+            <button class="p-btn" data-speed="2.2" onclick="setSpeedPreset(2.2)">🚀 2.2x 极速大屏</button>
+          </div>
+        </div>
+
+        <!-- 第三行：触摸板当前设置与状态记录清单 (Configuration & Status Record) -->
+        <div class="tp-record-card">
+          <div class="tp-record-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>📋 触摸板实时配置与运行状态记录 (Configuration Record)</span>
+              <span id="syncBadge" class="sync-tag ok">● 服务端已同步</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="tpLastUpdate" class="tp-record-time">等待初始化...</span>
+              <button class="tp-refresh-btn" onclick="refreshStatus(true)" title="立即拉取服务端内核真实状态重新校验">🔄 校验同步</button>
+            </div>
+          </div>
+          <div class="tp-record-grid">
+            <div class="tp-item">
+              <span class="tp-label">当前运行模式</span>
+              <span id="recMode" class="tp-value highlight">🖱️ 鼠标光标模式 (Mouse)</span>
+            </div>
+            <div class="tp-item">
+              <span class="tp-label">指针灵敏度 (速度)</span>
+              <span id="recSpeed" class="tp-value">0.50x (慢速精准)</span>
+            </div>
+            <div class="tp-item">
+              <span class="tp-label">动力学加速度</span>
+              <span id="recAccel" class="tp-value">动态人体工学曲线 (开启)</span>
+            </div>
+            <div class="tp-item">
+              <span class="tp-label">SELECT 按键动作</span>
+              <span id="recSelect" class="tp-value">模拟鼠标左键单击 (Left Click)</span>
+            </div>
+            <div class="tp-item">
+              <span class="tp-label">适配屏幕物理范围</span>
+              <span id="recScreen" class="tp-value">自动检测中...</span>
+            </div>
+            <div class="tp-item">
+              <span class="tp-label">终端事件日志级别</span>
+              <span id="recVerbose" class="tp-value">静音 (Debug 日志，不刷屏)</span>
+            </div>
+            <div class="tp-item">
+              <span class="tp-label">iPhone 遥控器连接状态</span>
+              <span id="recClient" class="tp-value">📱 等待连接</span>
+            </div>
+            <div class="tp-item">
+              <span class="tp-label">服务端内核一致性状态</span>
+              <span id="recSyncCheck" class="tp-value highlight">🟢 状态完全一致 (内核已校验)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <div class="grid">
+      <!-- 左列：最近按钮、虚拟遥控器调试、音量、历史 -->
+      <section class="column">
+        <article class="card">
+          <div class="card-head">
+            <h2>最近按键操作</h2>
+            <span id="eventCount" class="pill">0 events</span>
+          </div>
+          <div class="last-action">
+            <div>
+              <div id="actionName" class="action-name">—</div>
+              <div id="actionMeta" class="action-meta">等待遥控器输入</div>
+            </div>
+          </div>
+        </article>
+
+        <!-- 交互式虚拟遥控器（可在网页上直接点击调试系统响应） -->
+        <article class="card">
+          <div class="card-head">
+            <h2>模拟控制 (Web Debug Trigger)</h2>
+            <span class="pill">点击直接控制系统</span>
+          </div>
+          <div class="remote-wrap">
+            <div class="remote-dpad">
+              <button class="r-btn" style="grid-column: 2; grid-row: 1" onclick="sendAction('up')">▲</button>
+              <button class="r-btn" style="grid-column: 1; grid-row: 2" onclick="sendAction('left')">◀</button>
+              <button class="r-btn r-center" onclick="sendAction('select')">OK</button>
+              <button class="r-btn" style="grid-column: 3; grid-row: 2" onclick="sendAction('right')">▶</button>
+              <button class="r-btn" style="grid-column: 2; grid-row: 3" onclick="sendAction('down')">▼</button>
+            </div>
+            <div class="remote-actions">
+              <button class="r-btn" onclick="sendAction('menu')">◀ Back</button>
+              <button class="r-btn" onclick="sendAction('home')">⌂ Home</button>
+              <button class="r-btn" onclick="sendAction('play_pause')">⏯ Play/Pause</button>
+              <button class="r-btn" onclick="sendAction('mute')">🔇 Mute</button>
+              <button class="r-btn" onclick="sendAction('volume_up')">Vol +</button>
+              <button class="r-btn" onclick="sendAction('volume_down')">Vol -</button>
+              <button class="r-btn" onclick="sendAction('prev_track')">⏮ Prev</button>
+              <button class="r-btn" onclick="sendAction('next_track')">⏭ Next</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>音频音量</h2>
+            <span id="volPct" class="pill">50%</span>
+          </div>
+          <div class="vol-wrap">
+            <div class="vol-bar"><div id="volFill" class="vol-fill"></div></div>
+            <div id="volState" class="vol-state">当前音量 50%</div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>按键历史</h2>
+            <span class="pill">最新在上</span>
+          </div>
+          <ul id="history" class="history"></ul>
+        </article>
+      </section>
+
+      <!-- 右列：触控板轨迹、原始协议报文 -->
+      <section class="column">
+        <article class="card">
+          <div class="card-head">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h2>触控轨迹实时预览</h2>
+              <span id="phase" class="pill">idle</span>
+              <span id="idlePill" class="pill" style="display: none; color: var(--amber); border-color: rgba(255, 179, 71, 0.45); background: rgba(255, 179, 71, 0.12); font-weight: 600;">👁️ 空置预览中</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="strokeCount" class="pill" style="font-size: 11px;">0 点</span>
+              <button class="tp-refresh-btn" onclick="clearTouchCanvas()" title="清空画布上保留的触控轨迹">🗑️ 清空轨迹</button>
+            </div>
+          </div>
+          <div class="touch-wrap">
+            <canvas id="touch"></canvas>
+            <div id="coords" class="touch-readout">dx —&nbsp;&nbsp;dy —</div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>协议日志流</h2>
+            <span class="pill">实时输出</span>
+          </div>
+          <pre id="raw" class="raw"></pre>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const canvas = $('touch');
+    const ctx = canvas.getContext('2d');
+    const rawLines = [];
+    let eventCount = 0;
+    let pointCount = 0;
+    let drawing = false;
+    let curX = 0, curY = 0;
+    let canvasInitialized = false;
+
+    function resizeCanvas() {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const targetW = Math.round(rect.width * ratio);
+      const targetH = Math.round(rect.height * ratio);
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        let savedImg = null;
+        if (canvasInitialized && canvas.width > 0 && canvas.height > 0) {
+          try { savedImg = ctx.getImageData(0, 0, canvas.width, canvas.height); } catch (e) {}
+        }
+        canvas.width = targetW;
+        canvas.height = targetH;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        if (savedImg) {
+          try { ctx.putImageData(savedImg, 0, 0); } catch (e) {}
+        } else {
+          curX = rect.width / 2;
+          curY = rect.height / 2;
+        }
+        canvasInitialized = true;
+      }
+    }
+    new ResizeObserver(resizeCanvas).observe(canvas);
+
+    function clearTouchCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      curX = rect.width / 2;
+      curY = rect.height / 2;
+      drawing = false;
+      pointCount = 0;
+      $('coords').innerHTML = 'dx —&nbsp;&nbsp;dy —';
+      $('phase').textContent = 'idle';
+      const sc = $('strokeCount');
+      if (sc) sc.textContent = '0 点';
+    }
+
+    function drawTouch(data) {
+      const phase = Number(data.phase ?? data._tPh ?? 0);
+      const dx = Number(data.dx || 0);
+      const dy = Number(data.dy || 0);
+      const names = {1: 'Began', 2: 'Moved', 3: 'Stationary', 4: 'Ended'};
+      $('phase').textContent = names[phase] || `phase ${phase}`;
+      $('coords').innerHTML = `dx ${dx.toFixed(1)}&nbsp;&nbsp;dy ${dy.toFixed(1)}`;
+
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#70f1dc';
+      ctx.shadowColor = '#70f1dc';
+      ctx.shadowBlur = 6;
+
+      const rect = canvas.getBoundingClientRect();
+
+      if (phase === 1) { // Began: 手指按下，默认保留之前轨迹，开启新线段
+        drawing = true;
+        pointCount++;
+        const sc = $('strokeCount');
+        if (sc) sc.textContent = `${pointCount} 点`;
+
+        // 绘制落指锚点 (青色微光圆点)
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(112, 241, 220, 0.75)';
+        ctx.arc(curX, curY, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (phase === 2 && drawing) { // Moved: 持续平滑连线
+        pointCount++;
+        const sc = $('strokeCount');
+        if (sc) sc.textContent = `${pointCount} 点`;
+
+        ctx.beginPath();
+        ctx.moveTo(curX, curY);
+        curX = Math.max(10, Math.min(rect.width - 10, curX + dx * 0.8));
+        curY = Math.max(10, Math.min(rect.height - 10, curY + dy * 0.8));
+        ctx.lineTo(curX, curY);
+        ctx.stroke();
+      } else if (phase === 4) { // Ended: 手指抬起，画结束标记，不清空画布！
+        pointCount++;
+        const sc = $('strokeCount');
+        if (sc) sc.textContent = `${pointCount} 点`;
+
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(93, 169, 255, 0.85)';
+        ctx.arc(curX, curY, 4, 0, Math.PI * 2);
+        ctx.fill();
+        drawing = false;
+      }
+    }
+
+    function showButton(packet) {
+      const data = packet.data || {};
+      const name = String(data.name || packet.data || 'unknown');
+      $('actionName').textContent = name.toUpperCase().replaceAll('_', ' ');
+      $('actionMeta').innerHTML = `<span class="action-state">PRESSED</span>`;
+
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="time">${packet.timestamp}</span><strong>${name}</strong><code>EVENT</code>`;
+      $('history').prepend(li);
+      while ($('history').children.length > 25) $('history').lastChild.remove();
+    }
+
+    function showAudioState(packet) {
+      const data = packet.data || {};
+      const muted = Boolean(data.muted);
+      const vol = Number(data.volume ?? 0.5);
+      const pct = Math.round(vol * 100);
+      $('volFill').style.width = `${pct}%`;
+      $('volFill').classList.toggle('muted', muted);
+      $('volPct').textContent = muted ? `已静音 (${pct}%)` : `${pct}%`;
+      $('volState').textContent = muted ? `静音中 — 实际音量 ${pct}%` : `音量 ${pct}% (${Math.round(vol * 16)}/16)`;
+    }
+
+    function appendRaw(packet) {
+      rawLines.push(`[${String(packet.sequence).padStart(6, '0')}] ${packet.timestamp} ${packet.event} ${JSON.stringify(packet.data)}`);
+      while (rawLines.length > 150) rawLines.shift();
+      $('raw').textContent = rawLines.join('\n');
+      $('raw').scrollTop = $('raw').scrollHeight;
+    }
+
+    function sendAction(button) {
+      fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ button })
+      }).catch(console.error);
+    }
+
+    // ===== 触控板独立设置、驱动调速与状态记录管理 =====
+    let curMode = 'mouse'; // 'mouse' | 'direction' | 'idle'
+    let curSpeed = 0.5;
+    let curAccel = true;
+    let curVerbose = false;
+    let screenBounds = null;
+    let speedDebounceTimer = null;
+    let clientConnected = false;
+    let clientPeer = null;
+    let sessionReady = false;
+    let sseSource = null;
+
+    function formatSpeedDesc(speed) {
+      if (speed <= 0.6) return `${speed.toFixed(2)}x 慢速`;
+      if (speed <= 1.15) return `${speed.toFixed(2)}x 标准`;
+      if (speed <= 1.8) return `${speed.toFixed(2)}x 快速`;
+      return `${speed.toFixed(2)}x 极速`;
+    }
+
+    function formatSpeedDetail(speed) {
+      if (speed <= 0.6) return "慢速精准微调";
+      if (speed <= 1.15) return "标准舒适手感";
+      if (speed <= 1.8) return "快速顺畅移动";
+      return "极速跨屏大屏";
+    }
+
+    function normalizeMode(m) {
+      if (m === 'idle' || m === 'preview') return 'idle';
+      if (m === 'direction' || m === false) return 'direction';
+      if (m === 'mouse' || m === true) return 'mouse';
+      return 'mouse';
+    }
+
+    function updateTouchpadUI(settings) {
+      if (!settings) return;
+      if (settings.mode !== undefined && settings.mode !== null) {
+        curMode = normalizeMode(settings.mode);
+      } else if (typeof settings.mouse_mode === 'boolean') {
+        curMode = settings.mouse_mode ? 'mouse' : 'direction';
+      }
+      if (typeof settings.speed === 'number') curSpeed = settings.speed;
+      if (typeof settings.accel === 'boolean') curAccel = settings.accel;
+      if (typeof settings.verbose_events === 'boolean') curVerbose = settings.verbose_events;
+
+      // 顶部卡片 Badge 状态更新
+      const cardBadge = $('cardModeBadge');
+      if (cardBadge) {
+        if (curMode === 'idle') {
+          cardBadge.textContent = '👁️ 触控板空置模式 (仅看轨迹)';
+          cardBadge.className = 'mode-badge idle';
+        } else if (curMode === 'mouse') {
+          cardBadge.textContent = '🖱️ 鼠标光标模式';
+          cardBadge.className = 'mode-badge mouse';
+        } else {
+          cardBadge.textContent = '◀▲▼▶ 方向键模式';
+          cardBadge.className = 'mode-badge direction';
+        }
+      }
+
+      // 画布上方的空置提示胶囊标签
+      const idlePill = $('idlePill');
+      if (idlePill) {
+        idlePill.style.display = (curMode === 'idle') ? 'inline-flex' : 'none';
+      }
+
+      const speedDisp = $('speedDisplay');
+      if (speedDisp) speedDisp.textContent = formatSpeedDesc(curSpeed);
+
+      // 单选 radio 及卡片高亮状态同步
+      const rDir = $('radioModeDirection');
+      const rMouse = $('radioModeMouse');
+      const rIdle = $('radioModeIdle');
+      const lDir = $('labelModeDirection');
+      const lMouse = $('labelModeMouse');
+      const lIdle = $('labelModeIdle');
+
+      if (rDir) rDir.checked = (curMode === 'direction');
+      if (rMouse) rMouse.checked = (curMode === 'mouse');
+      if (rIdle) rIdle.checked = (curMode === 'idle');
+
+      if (lDir) lDir.className = 'mode-radio-card' + (curMode === 'direction' ? ' active-direction' : '');
+      if (lMouse) lMouse.className = 'mode-radio-card' + (curMode === 'mouse' ? ' active-mouse' : '');
+      if (lIdle) lIdle.className = 'mode-radio-card' + (curMode === 'idle' ? ' active-idle' : '');
+
+      // 动力学曲线按钮状态
+      const accelBtn = $('btnAccelToggle');
+      const accelText = $('accelText');
+      if (accelBtn && accelText) {
+        accelBtn.classList.toggle('active', curAccel);
+        accelText.textContent = curAccel ? '⚡ 动态加速度: 开启' : '📏 线性匀速: 1:1无加速';
+      }
+
+      // 终端详细事件日志开关
+      const verbBtn = $('btnVerboseToggle');
+      const verbDot = $('verboseDot');
+      const verbText = $('verboseText');
+      if (verbBtn && verbText) {
+        verbBtn.classList.toggle('active', curVerbose);
+        if (verbDot) {
+          verbDot.style.background = curVerbose ? 'var(--cyan)' : 'var(--muted)';
+          verbDot.style.boxShadow = curVerbose ? '0 0 8px var(--cyan)' : 'none';
+        }
+        verbText.textContent = curVerbose ? '📢 事件日志: 开启 (Info)' : '🔇 事件日志: 静默 (Debug)';
+      }
+
+      // 滑块刻度同步
+      const slider = $('speedSlider');
+      if (slider) slider.value = curSpeed;
+
+      // 预设档位高亮
+      document.querySelectorAll('.preset-group .p-btn').forEach(btn => {
+        const val = Number(btn.getAttribute('data-speed'));
+        btn.classList.toggle('active', Math.abs(val - curSpeed) < 0.08);
+      });
+
+      // 实时配置与运行状态记录表更新
+      const recMode = $('recMode');
+      if (recMode) {
+        if (curMode === 'idle') {
+          recMode.textContent = '👁️ 触控板空置模式 (仅看轨迹实时预览，不控制系统)';
+          recMode.className = 'tp-value highlight-idle';
+        } else if (curMode === 'mouse') {
+          recMode.textContent = '🖱️ 鼠标光标模式 (Mouse Pointer)';
+          recMode.className = 'tp-value highlight';
+        } else {
+          recMode.textContent = '◀▲▼▶ 方向键模式 (D-pad Arrows)';
+          recMode.className = 'tp-value';
+        }
+      }
+
+      const recSpeed = $('recSpeed');
+      if (recSpeed) {
+        recSpeed.textContent = `${curSpeed.toFixed(2)}x (${formatSpeedDetail(curSpeed)})`;
+      }
+
+      const recAccel = $('recAccel');
+      if (recAccel) {
+        recAccel.textContent = curAccel ? '动态人体工学曲线 (开启: 慢稳快甩)' : '纯线性匀速 1:1 (关闭)';
+      }
+
+      const recSelect = $('recSelect');
+      if (recSelect) {
+        if (curMode === 'idle') {
+          recSelect.textContent = '空置拦截 (不触发点击或按键)';
+        } else if (curMode === 'mouse') {
+          recSelect.textContent = '模拟鼠标左键单击 (Left Click)';
+        } else {
+          recSelect.textContent = '回车确认 (Return / Enter)';
+        }
+      }
+
+      const recVerbose = $('recVerbose');
+      if (recVerbose) {
+        recVerbose.textContent = curVerbose ? '详细输出 (Info 级别，输出按键到终端)' : '静音模式 (Debug 级别，避免终端刷屏)';
+      }
+
+      const recScreen = $('recScreen');
+      if (recScreen && screenBounds) {
+        recScreen.textContent = `${screenBounds[0]} × ${screenBounds[1]} (macOS 主屏幕物理分辨率)`;
+      }
+
+      const tpUpdate = $('tpLastUpdate');
+      if (tpUpdate) {
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+        tpUpdate.textContent = `${timeStr} 实时同步完成`;
+      }
+    }
+
+    async function sendTouchpadSettings(opts) {
+      try {
+        const targetMode = opts.mode !== undefined ? normalizeMode(opts.mode) : curMode;
+        const payload = {
+          mode: targetMode,
+          mouse_mode: targetMode === 'mouse',
+          speed: opts.speed !== undefined ? opts.speed : curSpeed,
+          accel: opts.accel !== undefined ? opts.accel : curAccel,
+          verbose_events: opts.verbose_events !== undefined ? opts.verbose_events : curVerbose,
+        };
+        const res = await fetch('/api/touchpad_settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        updateTouchpadUI(data);
+      } catch (e) {
+        console.error('Failed to update touchpad settings:', e);
+      }
+    }
+
+    function setMode(mode) {
+      sendTouchpadSettings({ mode });
+    }
+
+    function cycleMode() {
+      const modes = ['direction', 'mouse', 'idle'];
+      const nextIdx = (modes.indexOf(curMode) + 1) % modes.length;
+      sendTouchpadSettings({ mode: modes[nextIdx] });
+    }
+
+    function toggleMode() {
+      cycleMode();
+    }
+
+    function toggleAccel() {
+      sendTouchpadSettings({ accel: !curAccel });
+    }
+
+    function toggleVerbose() {
+      sendTouchpadSettings({ verbose_events: !curVerbose });
+    }
+
+    function setSpeedPreset(speed) {
+      clearTimeout(speedDebounceTimer);
+      sendTouchpadSettings({ speed });
+    }
+
+    function onSliderInput(val) {
+      const speed = parseFloat(val);
+      $('speedDisplay').textContent = formatSpeedDesc(speed);
+      $('recSpeed').textContent = `${speed.toFixed(2)}x (${formatSpeedDetail(speed)})`;
+      clearTimeout(speedDebounceTimer);
+      speedDebounceTimer = setTimeout(() => {
+        sendTouchpadSettings({ speed });
+      }, 40);
+    }
+
+    function onSliderChange(val) {
+      clearTimeout(speedDebounceTimer);
+      sendTouchpadSettings({ speed: parseFloat(val) });
+    }
+
+    function updateClientStatusBadge() {
+      const badge = $('clientStatusBadge');
+      const conn = $('connection');
+      const dot = $('dot');
+      const recClient = $('recClient');
+
+      if (clientConnected) {
+        if (badge) {
+          badge.className = 'client-badge connected';
+          badge.textContent = `📱 iPhone 已连接${clientPeer ? ' (' + clientPeer + ')' : ''}`;
+        }
+        if (conn) {
+          conn.textContent = sessionReady ? '遥控会话已就绪' : `客户端已连接 (${clientPeer || ''})`;
+        }
+        if (dot) dot.classList.add('online');
+        if (recClient) {
+          recClient.textContent = `🟢 已连接 (${clientPeer || '会话中'})`;
+          recClient.className = 'tp-value highlight';
+        }
+      } else {
+        if (badge) {
+          badge.className = 'client-badge waiting';
+          badge.textContent = '📱 等待 iPhone 连接';
+        }
+        if (conn) {
+          const sseOk = sseSource && sseSource.readyState === EventSource.OPEN;
+          conn.textContent = sseOk ? '服务端运行中 (等待 iPhone)' : '等待连接服务端';
+        }
+        if (recClient) {
+          recClient.textContent = '📱 未连接 (打开控制中心连接)';
+          recClient.className = 'tp-value';
+        }
+      }
+    }
+
+    async function refreshStatus(isManual = false) {
+      const btn = $('btnGlobalRefresh');
+      const btnText = $('refreshBtnText');
+      const syncBadge = $('syncBadge');
+      const recSync = $('recSyncCheck');
+
+      if (isManual) {
+        if (btn) btn.classList.add('loading');
+        if (btnText) btnText.textContent = '同步中...';
+        if (syncBadge) {
+          syncBadge.className = 'sync-tag syncing';
+          syncBadge.textContent = '⏳ 与服务端校验中...';
+        }
+      }
+
+      try {
+        const res = await fetch('/api/status', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const d = await res.json();
+
+        if (d.device_name) {
+          $('subTitle').textContent = `当前设备: ${d.device_name} · 实时状态监控 & 交互调试`;
+        }
+        if (Array.isArray(d.screen_size)) {
+          screenBounds = d.screen_size;
+        }
+
+        clientConnected = Boolean(d.client_connected);
+        clientPeer = d.client_peer || null;
+        sessionReady = Boolean(d.session_ready);
+        updateClientStatusBadge();
+
+        updateTouchpadUI({
+          mode: d.mode,
+          mouse_mode: d.mouse_mode,
+          speed: d.mouse_speed,
+          accel: d.mouse_accel,
+          verbose_events: d.verbose_events,
+        });
+
+        if (d.audio && typeof d.audio.volume === 'number') {
+          showAudioState({ data: d.audio });
+        }
+
+        if (recSync) {
+          recSync.textContent = '🟢 状态完全一致 (内核已校验)';
+          recSync.classList.add('pulse-update');
+          setTimeout(() => recSync.classList.remove('pulse-update'), 1200);
+        }
+
+        if (syncBadge) {
+          syncBadge.className = 'sync-tag ok';
+          syncBadge.textContent = '● 服务端已同步';
+        }
+
+        if (isManual) {
+          if (btn) btn.classList.remove('loading');
+          if (btnText) btnText.textContent = '✅ 已同步';
+          setTimeout(() => {
+            if (btnText) btnText.textContent = '刷新状态';
+          }, 1500);
+        }
+
+        // 检查 SSE 连接是否活跃
+        if (!sseSource || sseSource.readyState === EventSource.CLOSED) {
+          initSSE();
+        }
+      } catch (err) {
+        console.error('Refresh status error:', err);
+        if (syncBadge) {
+          syncBadge.className = 'sync-tag';
+          syncBadge.style.color = 'var(--red)';
+          syncBadge.textContent = '❌ 同步失败';
+        }
+        if (recSync) {
+          recSync.textContent = '⚠️ 同步异常 (检查服务是否运行)';
+          recSync.className = 'tp-value';
+        }
+        if (isManual) {
+          if (btn) btn.classList.remove('loading');
+          if (btnText) btnText.textContent = '⚠️ 同步失败';
+          setTimeout(() => {
+            if (btnText) btnText.textContent = '刷新状态';
+          }, 2000);
+        }
+      }
+    }
+
+    function initSSE() {
+      if (sseSource) {
+        try { sseSource.close(); } catch(e) {}
+      }
+      sseSource = new EventSource('/events');
+      sseSource.onopen = () => {
+        $('dot').classList.add('online');
+        updateClientStatusBadge();
+      };
+      sseSource.onerror = () => {
+        $('dot').classList.remove('online');
+        $('connection').textContent = '服务连接中断，重连中...';
+      };
+      sseSource.onmessage = message => {
+        try {
+          const packet = JSON.parse(message.data);
+          eventCount = Math.max(eventCount, Number(packet.sequence) || 0);
+          $('eventCount').textContent = `${eventCount} events`;
+          if (packet.event === 'button') showButton(packet);
+          if (packet.event === 'touch') drawTouch(packet.data || {});
+          if (packet.event === 'audio_state') showAudioState(packet);
+          if (packet.event === 'mode_changed') {
+            updateTouchpadUI(packet.data || {});
+          }
+          if (packet.event === 'touchpad_settings' || packet.event === 'mouse_settings') {
+            updateTouchpadUI(packet.data || {});
+          }
+          if (packet.event === 'client_connected') {
+            clientConnected = true;
+            clientPeer = packet.data && packet.data.peer ? packet.data.peer : null;
+            updateClientStatusBadge();
+          }
+          if (packet.event === 'verified') {
+            $('connection').textContent = '已通过加密认证';
+          }
+          if (packet.event === 'session_started' || packet.event === 'remote_ready') {
+            sessionReady = true;
+            updateClientStatusBadge();
+          }
+          if (packet.event === 'client_disconnected') {
+            clientConnected = false;
+            clientPeer = null;
+            sessionReady = false;
+            updateClientStatusBadge();
+          }
+          appendRaw(packet);
+        } catch (e) {
+          console.error(e);
+        }
+      };
+    }
+
+    // 页面初始化：主动向服务端校验拉取全部真实状态并建立长连接
+    refreshStatus(false);
+    initSSE();
+  </script>
+</body>
+</html>

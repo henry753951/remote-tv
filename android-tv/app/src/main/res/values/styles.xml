@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.FakeAtv" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#121212</item>
+        <item name="colorPrimary">#4CAF50</item>
+        <item name="colorPrimaryDark">#388E3C</item>
+        <item name="colorAccent">#81C784</item>
+    </style>
+</resources>
