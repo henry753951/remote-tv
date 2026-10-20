@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> 獨立遙控接收器已整合至 [AirPlay & Remote Receiver](https://github.com/henry753951/airplay-remote-receiver)。新版在同一 App 提供 AirPlay 與 iPhone 內建 Apple TV 遙控器接收，並共用電視設定。本倉庫封存保留原始碼歷史，新安裝請使用整合版。
+
 # Remote TV
 
 使用 iPhone 內建「Apple TV 遙控器」操控 Android 電視。
