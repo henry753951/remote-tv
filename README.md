@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> This standalone receiver has moved into [AirPlay & Remote Receiver](https://github.com/henry753951/airplay-remote-receiver). The combined app provides AirPlay and native Apple TV Remote reception with shared TV settings. This repository is archived for source history; use the combined project for new installations.
+
 <img src="docs/assets/icon.svg" width="88" alt="Remote TV icon" />
 
 # Remote TV
